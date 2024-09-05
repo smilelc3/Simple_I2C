@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps 		// 定义仿真中时间的基本单位1ns, 仿真中时间测量的精度1ps
 
 
-module i2c_controller(
+module i2c_master_controller(
 	input wire clk,		// 外部时钟
 	input wire rst,		// 复位信号
 	input wire [6:0] addr,	// 7位i2c地址
@@ -52,7 +52,9 @@ module i2c_controller(
 		else counter2 <= counter2 + 1;
 	end 
 	
-	always @(negedge i2c_clk, posedge rst) begin
+
+	// 快速监控state状态，避免竞态
+	always @(*) begin
 		if(rst == 1) begin
 			i2c_scl_enable <= 0;
 		end else begin

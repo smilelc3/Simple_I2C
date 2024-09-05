@@ -19,7 +19,7 @@ module i2c_controller_tb;
 	wire i2c_scl;
 
 	// Instantiate the Unit Under Test (UUT)
-	i2c_controller master (
+	i2c_master_controller master (
 		.clk(clk), 
 		.rst(rst), 
 		.addr(addr), 
@@ -57,7 +57,7 @@ module i2c_controller_tb;
 		rst = 0;		
 		addr = 7'b0101010;
 		data_in = 8'b10101010;
-		rw = 0;	
+		rw = 1;	
 		enable = 1;
 		#10;
 		enable = 0;

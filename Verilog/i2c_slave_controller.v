@@ -2,7 +2,7 @@
 
 module i2c_slave_controller(
 	inout sda,			// SDA数据线
-	in scl				// SCL时钟线
+	input scl				// SCL时钟线
 	);
 	
 	localparam ADDRESS = 7'b0101010;		// 从器件地址
@@ -100,8 +100,8 @@ module i2c_slave_controller(
 			end
 			
 			WRITE_DATA: begin			// 从写入数据，供主读取
-				sda_out <= data_out[counter];	// 先写sda_out，再允许写SDA，避免短暂跳变
 				write_enable <= 1;
+				sda_out <= data_out[counter];	// 先写sda_out，再允许写SDA，避免短暂跳变
 			end
 			
 			SEND_ACK2: begin			
