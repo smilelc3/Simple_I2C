@@ -1,7 +1,7 @@
-`timescale 1ns / 1ps
+`timescale 10us / 1us
 
-module i2c_slave_controller(
-	inout sda,			// SDA数据线
+module i2c_slave_controller (
+	inout sda,				// SDA数据线
 	input scl				// SCL时钟线
 	);
 	
@@ -33,7 +33,7 @@ module i2c_slave_controller(
 	end
 	
 	always @(posedge sda) begin
-		if ((start == 1) && (scl == 1)) begin	//  当SDA收到SDA上升沿， 但是SCL高时，认为开始i2c数据传输
+		if ((start == 1) && (scl == 1)) begin	//  当SDA收到SDA上升沿， 但是SCL高时，认为结束数据
 			state <= READ_ADDR;
 			start <= 0;
 			write_enable <= 0;
@@ -101,7 +101,7 @@ module i2c_slave_controller(
 			
 			WRITE_DATA: begin			// 从写入数据，供主读取
 				write_enable <= 1;
-				sda_out <= data_out[counter];	// 先写sda_out，再允许写SDA，避免短暂跳变
+				sda_out <= data_out[counter];
 			end
 			
 			SEND_ACK2: begin			

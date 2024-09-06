@@ -1,19 +1,19 @@
-`timescale 1ns / 1ps 		// 定义仿真中时间的基本单位1ns, 仿真中时间测量的精度1ps
+`timescale 10us / 1us 		// 定义仿真中时间的基本单位, 仿真中时间测量的精度
 
 
-module i2c_master_controller(
-	input wire clk,		// 外部时钟
+module i2c_master_controller (
+	input wire i2c_clk_100k,		// 外部时钟，i2c 100k标准模式
 	input wire rst,		// 复位信号
 	input wire [6:0] addr,	// 7位i2c地址
 	input wire [7:0] data_in,	// 输入数据
 	input wire enable,		// 
-	input wire rw,		// read or write
+	input wire rw,		// read or write 高读低写
 
 	output reg [7:0] data_out,	// 输出数据
 	output wire ready,		// ready信号
 
-	inout i2c_sda,			// 双向SDA线
-	inout wire i2c_scl		// 双线SCL线
+	inout wire i2c_sda,			// 双向SDA线
+	inout wire i2c_scl			// 双线SCL线
 	);
 
 	// localparam 是一种用于定义局部参数的指令。与 parameter 不同，localparam 只能在定义它的模块内使用，无法在模块外进行重定义
@@ -33,24 +33,13 @@ module i2c_master_controller(
 	reg [7:0] saved_addr;
 	reg [7:0] saved_data;
 	reg [7:0] counter;
-	reg [7:0] counter2 = 0;
 	reg write_enable;
 	reg sda_out;
 	reg i2c_scl_enable = 0;
-	reg i2c_clk = 1;
 
 	assign ready = ((rst == 0) && (state == IDLE)) ? 1 : 0;		// 无RST且状态机回到IDLE
-	assign i2c_scl = (i2c_scl_enable == 0 ) ? 1 : i2c_clk;		// 需要使用i2c的时候，i2c_scl 才有时钟信号，否则高电平
+	assign i2c_scl = (i2c_scl_enable == 0 ) ? 1 : i2c_clk_100k;		// 需要使用i2c的时候，i2c_scl 才有时钟信号，否则高电平
 	assign i2c_sda = (write_enable == 1) ? sda_out : 'bz;		// 需要写数据的时候，i2c_sda 切换到sda_out，否则保持高阻抗，可读
-	
-	// 分频器
-	always @(posedge clk) begin
-		if (counter2 == (DIVIDE_BY/2) - 1) begin
-			i2c_clk <= ~i2c_clk;
-			counter2 <= 0;
-		end
-		else counter2 <= counter2 + 1;
-	end 
 	
 
 	// 快速监控state状态，避免竞态
@@ -68,7 +57,7 @@ module i2c_master_controller(
 	end
 
 
-	always @(posedge i2c_clk, posedge rst) begin		// 上升沿处理状态机和数据
+	always @(posedge i2c_clk_100k, posedge rst) begin		// 上升沿处理状态机和数据
 		if(rst == 1) begin
 			state <= IDLE;
 		end		
@@ -110,8 +99,8 @@ module i2c_master_controller(
 				end
 				
 				READ_ACK2: begin						// 等待从器件ACK
-					if ((i2c_sda == 0) && (enable == 1)) state <= IDLE;
-					else state <= STOP;
+					if ((i2c_sda == 0) && (enable == 1)) state <= STOP;
+					else state <= IDLE;
 				end
 
 				READ_DATA: begin						// 开始逐位读取数据
@@ -131,44 +120,48 @@ module i2c_master_controller(
 		end
 	end
 	
-	always @(negedge i2c_clk, posedge rst) begin	//  SCL上一次信号的下降沿，写入数据
+	always @(negedge i2c_clk_100k, posedge rst) begin	//  SCL上一次信号的下降沿，写入数据
 		if(rst == 1) begin
 			sda_out <= 1;
 			write_enable <= 1;
 		end else begin
 			case(state)
-				
 				START: begin
-					sda_out <= 0;
 					write_enable <= 1;				// 下一步会往SDA线写地址数据，开放写
+					sda_out <= 0;
 				end
 				
 				ADDRESS: begin
+					write_enable <= 1;
 					sda_out <= saved_addr[counter];	// 开始写要读取的i2c从器件地址，从高bit开始写
 				end
 				
-				READ_ACK: begin						// 等待ACK
-					write_enable <= 0;
+				READ_ACK: begin						// 等待从发起ACK
+					write_enable <= 0;				// 放弃写权
 				end
 				
-				WRITE_DATA: begin 					
+				WRITE_DATA: begin 		
+					write_enable <= 1;				
 					sda_out <= saved_data[counter];
-					write_enable <= 1;			  //  写入数据
 				end
 				
 				WRITE_ACK: begin				
-					sda_out <= 0;
 					write_enable <= 1;
-					
+					sda_out <= 0;
 				end
 				
-				READ_DATA: begin
+				READ_ACK2: begin				// 等待从发起ACK
+					write_enable <= 0;				// 放弃写权
+				end
+				
+				
+				READ_DATA: begin				// 等待从发送数据
 					write_enable <= 0;				
 				end
 				
-				STOP: begin						// STOP状态，理论分析走不到该分支
-					sda_out <= 1;
+				STOP: begin						// STOP状态
 					write_enable <= 1;	
+					sda_out <= 1;
 				end
 			endcase
 		end
